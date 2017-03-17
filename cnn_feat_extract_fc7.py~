@@ -1,0 +1,48 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Mar  3 11:08:29 2017
+
+@author: wangs
+"""
+
+import sys 
+import caffe
+import matplotlib.pyplot as plt
+
+# Make sure that caffe is on the python path:
+caffe_root = '/home/wangs/caffe/'  
+img_root = '/home/wangs/Work/Flower_SLIC_CNN/image/'
+feat_root = '/home/wangs/Work/Flower_SLIC_CNN/features/'
+sys.path.insert(0, caffe_root + 'python')
+
+def cnn_feat_extract(img):
+    img_path = img_root+img
+    #设置默认显示参数
+    plt.rcParams['figure.figsize'] = (10, 10)  #图像显示大小
+    plt.rcParams['image.interpolation'] = 'nearest'   #最近邻差值: 像素为正方形
+    plt.rcParams['image.cmap'] = 'gray'  #使用灰度输出而不是彩色输出
+    
+    caffe.set_mode_cpu()
+    
+    net = caffe.Net(caffe_root + 'models/bvlc_alexnet/deploy.prototxt',
+                    caffe_root + 'models/bvlc_alexnet/bvlc_alexnet.caffemodel',
+                    caffe.TEST)
+    
+    # input preprocessing: 'data' is the name of the input blob == net.inputs[0]
+    transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})  # 对输入数据进行变换
+    transformer.set_transpose('data', (2,0,1))  #将图像的通道数设置为outermost的维数
+    #transformer.set_mean('data', np.load(caffe_root + 'python/caffe/imagenet/ilsvrc_2012_mean.npy').mean(1).mean(1)) # mean pixel
+    transformer.set_raw_scale('data', 255)  # the reference model operates on images in [0,255] range instead of [0,1]
+    transformer.set_channel_swap('data', (2,1,0))  # the reference model has channels in BGR order instead of RGB
+    
+    # set net to batch size of 10
+    net.blobs['data'].reshape(10,3,227,227)
+    #imgscale = ['32', '64', '128']
+    
+    #extract features fc7
+    net.blobs['data'].data[...] = transformer.preprocess('data', caffe.io.load_image(img_path))
+    out = net.forward()  # call once for allocation
+    feat = net.blobs['fc7'].data[0]
+    
+    return feat
